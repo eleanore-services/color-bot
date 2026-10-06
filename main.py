@@ -88,6 +88,9 @@ def deleteRoleFromDatabase(role_id: int, guild_id: int) -> None:
     cursor = dbcon.cursor()
     for row in cursor.execute(f"SELECT user_id, role_id FROM g_{role.guild.id} WHERE role_id == {role_id}"):
         cursor.execyte(f"DELETE FROM g_{str(row[1])} WHERE user_id == {str(row[0])}")
+    dbcon.commit()
+    log("Deleted "+str(role.id)+" in guild "+str(interaction.guild_id)+" as it no longer existed.")
+
 
 
 # Stolen from discord.py's doc
@@ -126,6 +129,10 @@ async def setcolor(interaction: discord.Interaction, hex: str, name: str|None):
         WHERE user_id == {str(user_id)}
     """)
     result = cursor.fetchone()
+    if discord.utils.get(interaction.guild.roles, id=result[0]) == None:
+        # Role no longer exists, clearing the entry for everyone.
+        deleteRoleFromDatabase(result[0], interaction.guild_id)
+        result = None
     if result is None:
         if name == None:
             await interaction.response.send_message("You don't have a color role yet and you didn't specify a role name, so no role could be created :(")
