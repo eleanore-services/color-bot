@@ -125,6 +125,8 @@ async def setcolor(interaction: discord.Interaction, hex: str, name: str|None):
             await interaction.response.send_message("You don't have a color role yet and you didn't specify a role name, so no role could be created :(")
             return
         role = await interaction.guild.create_role(name=name, color=color, reason="Color role created by request from "+interaction.user.name)
+        member = await guild.fetch_member(user.id)
+        member.add_roles(role)
         log("Created "+role.name+" ("+str(role.id)+") in guild "+interaction.guild.name+" ("+str(interaction.guild_id)+") per request from "+str(user_id))
         cursor.execute(f"""
             INSERT INTO g_{str(interaction.guild_id)} VALUES
