@@ -84,6 +84,13 @@ def ensureTableExists(table: str) -> None:
         dbcon.commit()
     return None
 
+# Stolen from discord.py's doc
+def is_guild_owner():
+    def predicate(ctx):
+        return ctx.guild is not None and ctx.guild.owner_id == ctx.author.id
+    return commands.check(predicate)
+
+
 @tree.command(
     name="color",
     description="Set your colour!"
@@ -115,7 +122,7 @@ async def setcolor(interaction: discord.Interaction, hex: str, name: str|None):
     result = cursor.fetchone()
     if result is None:
         if name == None:
-            await interaction.response.send_message("You don't have a color role yet but you didn't specify a role name, so no role could be created :(")
+            await interaction.response.send_message("You don't have a color role yet and you didn't specify a role name, so no role could be created :(")
             return
         role = await interaction.guild.create_role(name=name, color=color, reason="Color role created by request from "+interaction.user.name)
         log("Created "+role.name+" ("+str(role.id)+") in guild "+interaction.guild.name+" ("+str(interaction.guild_id)+") per request from "+str(user_id))
@@ -137,9 +144,65 @@ async def setcolor(interaction: discord.Interaction, hex: str, name: str|None):
     name="registerrole",
     description="Register a role as a colour role, if you used other colour bots."
 )
+@app_commands.describe(role='Role to register.')
 @app_commands.guild_only()
+@commands.check_any(commands.has_guild_permissions(manage_roles=True), commands.has_guild_permissions(administrator=True), is_guild_owner())
 async def registerrole(interaction: discord.Interaction, role: discord.Role):
-    await interaction.response.send_message("This command hasn't been implemented yet. There will be permission checks for sure.")
+    cursor = dbcon.cursor()
+
+    # I haven't found another way to pass the interaction to its own view. Feel free to tell me how if you know.
+    dirty_hack = []
+
+    class ConfirmView(discord.ui.View):
+        def __init__(self, main_interaction: discord.Interaction):
+            super().__init__()
+            self.main_interaction = main_interaction
+
+        @discord.ui.button(label="Yes", style=discord.ButtonStyle.green, emoji="✅")
+        async def button_callback_yes(self, interaction: discord.Interaction, button: discord.Button):
+            await interaction.response.defer()
+            for user in role.members:
+                cursor.execute(f"""
+                    SELECT role_id
+                    FROM g_{str(self.main_interaction.guild_id)}
+                    WHERE user_id == {str(user.id)}
+                """)
+                result = cursor.fetchone()
+                if result is None:
+                    cursor.execute(f"""
+                        INSERT INTO g_{str(self.main_interaction.guild_id)} VALUES
+                        ({str(user.id)}, {str(role.id)})
+                    """)
+                    dbcon.commit()
+            await dirty_hack[0].resource.edit(content=f"Role registered for all of its members!",view=None)
+
+        @discord.ui.button(label="No", style=discord.ButtonStyle.red, emoji="✖️")
+        async def button_callback_no(self, interaction: discord.Interaction, button: discord.Button):
+            await dirty_hack[0].resource.edit(content="Understood, cancelling role registration.",view=None)
+
+    if len(role.members) > 1:
+        button1=discord.ui.Button(label="<",style=discord.ButtonStyle.green)
+        dirty_hack.append(await interaction.response.send_message("This role is assigned to multiple members. Are you sure you want to do this?\nPlease note that any member with the role will be able to edit its colour.",view=ConfirmView(interaction)))
+    elif len(role.members) == 1:
+        cursor.execute(f"""
+            SELECT role_id
+            FROM g_{str(interaction.guild_id)}
+            WHERE user_id == {role.members[0].id}
+        """)
+        result = cursor.fetchone()
+        if result is None:
+            cursor.execute(f"""
+                INSERT INTO g_{str(interaction.guild_id)} VALUES
+                ({str(role.members[0].id)}, {str(role.id)})
+            """)
+            dbcon.commit()
+            await interaction.response.send(f"Role registered for its member!")
+        else:
+            await interaction.response.send(f"Only member already has a color role, so no registration done.")
+    else:
+        await interaction.response.send(f"Role has no member, so no registration done.")
+
+
     return
 
 
