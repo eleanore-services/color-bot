@@ -148,6 +148,7 @@ async def setcolor(interaction: discord.Interaction, hex: str, name: str|None):
 @app_commands.guild_only()
 @commands.check_any(commands.has_guild_permissions(manage_roles=True), commands.has_guild_permissions(administrator=True), is_guild_owner())
 async def registerrole(interaction: discord.Interaction, role: discord.Role):
+    ensureTableExists(str(interaction.guild_id))
     cursor = dbcon.cursor()
 
     # I haven't found another way to pass the interaction to its own view. Feel free to tell me how if you know.
