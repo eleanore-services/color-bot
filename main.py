@@ -84,6 +84,12 @@ def ensureTableExists(table: str) -> None:
         dbcon.commit()
     return None
 
+def deleteRoleFromDatabase(role_id: int, guild_id: int) -> None:
+    cursor = dbcon.cursor()
+    for row in cursor.execute(f"SELECT user_id, role_id FROM g_{role.guild.id} WHERE role_id == {role_id}"):
+        cursor.execyte(f"DELETE FROM g_{str(row[1])} WHERE user_id == {str(row[0])}")
+
+
 # Stolen from discord.py's doc
 def is_guild_owner():
     def predicate(ctx):
@@ -193,7 +199,10 @@ async def registerrole(interaction: discord.Interaction, role: discord.Role):
             WHERE user_id == {role.members[0].id}
         """)
         result = cursor.fetchone()
-        if result is None:
+        if result is None or discord.utils.get(interaction.guild.roles, id=result[0]) == None:
+            if discord.utils.get(interaction.guild.roles, id=result[0]) == None:
+                # Role no longer exists, clearing the entry for everyone.
+                deleteRoleFromDatabase(result[0], interaction.guild_id)
             cursor.execute(f"""
                 INSERT INTO g_{str(interaction.guild_id)} VALUES
                 ({str(role.members[0].id)}, {str(role.id)})
@@ -208,6 +217,9 @@ async def registerrole(interaction: discord.Interaction, role: discord.Role):
 
     return
 
+@colorbot.event
+async def on_guild_role_delete(role: discord.Role):
+    deleteRoleFromDatabase(role.id, role.guild.id)
 
 @colorbot.event
 async def on_ready() -> None:
