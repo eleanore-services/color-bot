@@ -199,11 +199,11 @@ async def registerrole(interaction: discord.Interaction, role: discord.Role):
                 ({str(role.members[0].id)}, {str(role.id)})
             """)
             dbcon.commit()
-            await interaction.response.send(f"Role registered for its member!")
+            await interaction.response.send_message(f"Role registered for its member!")
         else:
-            await interaction.response.send(f"Only member already has a color role, so no registration done.")
+            await interaction.response.send_message(f"Only member already has a color role, so no registration done.")
     else:
-        await interaction.response.send(f"Role has no member, so no registration done.")
+        await interaction.response.send_message(f"Role has no member, so no registration done.")
 
 
     return
