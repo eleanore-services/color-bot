@@ -129,7 +129,7 @@ async def setcolor(interaction: discord.Interaction, hex: str, name: str|None):
         WHERE user_id == {str(user_id)}
     """)
     result = cursor.fetchone()
-    if discord.utils.get(interaction.guild.roles, id=result[0]) == None:
+    if (result is not None) and (discord.utils.get(interaction.guild.roles, id=result[0]) is None):
         # Role no longer exists, clearing the entry for everyone.
         deleteRoleFromDatabase(result[0], interaction.guild_id)
         result = None
@@ -138,8 +138,8 @@ async def setcolor(interaction: discord.Interaction, hex: str, name: str|None):
             await interaction.response.send_message("You don't have a color role yet and you didn't specify a role name, so no role could be created :(")
             return
         role = await interaction.guild.create_role(name=name, color=color, reason="Color role created by request from "+interaction.user.name)
-        member = await guild.fetch_member(user.id)
-        member.add_roles(role)
+        member = await interaction.guild.fetch_member(user_id)
+        await member.add_roles(role)
         log("Created "+role.name+" ("+str(role.id)+") in guild "+interaction.guild.name+" ("+str(interaction.guild_id)+") per request from "+str(user_id))
         cursor.execute(f"""
             INSERT INTO g_{str(interaction.guild_id)} VALUES
@@ -149,7 +149,7 @@ async def setcolor(interaction: discord.Interaction, hex: str, name: str|None):
     else:
         role_id = int(result[0]) # should already be int anyway
         role = discord.utils.get(interaction.guild.roles, id=role_id)
-        role.edit(color=color)
+        await role.edit(color=color)
         log("Modified "+role.name+" ("+str(role.id)+") in guild "+interaction.guild.name+" ("+str(interaction.guild_id)+") per request from "+str(user_id))
 
     await interaction.response.send_message(random.choice(color_change_responses))
